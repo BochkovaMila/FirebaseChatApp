@@ -6,6 +6,21 @@
 //
 
 import SwiftUI
+import Firebase
+
+class FirebaseManager: NSObject {
+    
+    let auth: Auth
+    
+    static let shared = FirebaseManager()
+    
+    override init() {
+        FirebaseApp.configure()
+        self.auth = Auth.auth()
+        super.init()
+    }
+    
+}
 
 struct LoginView: View {
     
@@ -57,6 +72,9 @@ struct LoginView: View {
                             Spacer()
                         }.background(Color.blue)
                     }
+                    
+                    Text(self.loginStatusMessage)
+                        .foregroundColor(.red)
                 }
                 .padding()
             }
@@ -64,13 +82,40 @@ struct LoginView: View {
             .background(Color(.init(white: 0, alpha: 0.05))
                 .ignoresSafeArea())
         }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
     
     private func handleAction() {
         if isLoginMode {
-            print("Log into Firebase with existing credentials")
+            loginUser()
         } else {
-            print("Register a new account inside of Firebase Auth and store image")
+            createNewAccount()
+        }
+    }
+    
+    @State var loginStatusMessage = ""
+    
+    private func createNewAccount() {
+        FirebaseManager.shared.auth.createUser(withEmail: email, password: password) { result, error in
+            if let err = error {
+                print("Failed to create user:", err)
+                self.loginStatusMessage = "Failed to create user: \(err)"
+                return
+            }
+            print("Successfully created user \(result?.user.uid ?? "")")
+            self.loginStatusMessage = "Successfully created user \(result?.user.uid ?? "")"
+        }
+    }
+    
+    private func loginUser() {
+        FirebaseManager.shared.auth.signIn(withEmail: email, password: password) { result, error in
+            if let err = error {
+                print("Failed to log in user:", err)
+                self.loginStatusMessage = "Failed to log in as user: \(err)"
+                return
+            }
+            print("Successfully logged in user \(result?.user.uid ?? "")")
+            self.loginStatusMessage = "Successfully logged in as user \(result?.user.uid ?? "")"
         }
     }
 }
