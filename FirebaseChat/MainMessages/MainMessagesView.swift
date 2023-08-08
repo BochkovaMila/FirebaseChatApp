@@ -13,6 +13,8 @@ class MainMessagesViewModel: ObservableObject {
     
     @Published var errorMessage = ""
     @Published var chatUser: ChatUser?
+    @Published var isUserCurrentlyLogedOut = false
+    
     
     init() {
         DispatchQueue.main.async {
@@ -36,8 +38,6 @@ class MainMessagesViewModel: ObservableObject {
             self.chatUser = .init(data: data)
         }
     }
-    
-    @Published var isUserCurrentlyLogedOut = false
     
     func handleSignOut() {
         isUserCurrentlyLogedOut.toggle()
@@ -152,9 +152,11 @@ struct MainMessagesView: View {
         }
     }
     
+    @State var shouldShowNewMessageScreen = false
+    
     private var newMessageButton: some View {
         Button {
-            
+            shouldShowNewMessageScreen.toggle()
         } label: {
             HStack {
                 Spacer()
@@ -168,6 +170,9 @@ struct MainMessagesView: View {
             .cornerRadius(32)
             .padding(.horizontal)
             .shadow(radius: 5)
+        }
+        .fullScreenCover(isPresented: $shouldShowNewMessageScreen) {
+            CreateNewMessageView()
         }
     }
 }
