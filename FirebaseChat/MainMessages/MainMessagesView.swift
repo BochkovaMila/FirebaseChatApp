@@ -8,9 +8,6 @@
 import SwiftUI
 import SDWebImageSwiftUI
 
-struct ChatUser {
-    let uid, email, profileImageUrl: String
-}
 
 class MainMessagesViewModel: ObservableObject {
     
@@ -18,10 +15,13 @@ class MainMessagesViewModel: ObservableObject {
     @Published var chatUser: ChatUser?
     
     init() {
+        DispatchQueue.main.async {
+            self.isUserCurrentlyLogedOut = FirebaseManager.shared.auth.currentUser?.uid == nil
+        }
         fetchCurrentUser()
     }
     
-    private func fetchCurrentUser() {
+    func fetchCurrentUser() {
         
         guard let uid = FirebaseManager.shared.auth.currentUser?.uid else { return }
         
@@ -33,11 +33,15 @@ class MainMessagesViewModel: ObservableObject {
             
             guard let data = snapshot?.data() else { return }
             
-            let uid = data["uid"] as? String ?? ""
-            let email = data["email"] as? String ?? ""
-            let profileImageUrl =  data["profileImageUrl"] as? String ?? ""
-            self.chatUser = ChatUser(uid: uid, email: email, profileImageUrl: profileImageUrl)
+            self.chatUser = .init(data: data)
         }
+    }
+    
+    @Published var isUserCurrentlyLogedOut = false
+    
+    func handleSignOut() {
+        isUserCurrentlyLogedOut.toggle()
+        try? FirebaseManager.shared.auth.signOut()
     }
     
 }
@@ -106,9 +110,16 @@ struct MainMessagesView: View {
             .init(title: Text("Settings"), message: Text("What do you want to do?"), buttons: [
                 .destructive(Text("Sign Out"), action: {
                     print("handle sigh out")
+                    vm.handleSignOut()
                 }),
                 .cancel()
             ])
+        }
+        .fullScreenCover(isPresented: $vm.isUserCurrentlyLogedOut) {
+            LoginView(didCompleteLoginProcess: {
+                self.vm.isUserCurrentlyLogedOut = false
+                self.vm.fetchCurrentUser()
+            })
         }
     }
     
