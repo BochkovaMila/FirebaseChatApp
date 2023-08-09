@@ -9,26 +9,14 @@ import SwiftUI
 import SDWebImageSwiftUI
 import Firebase
 import FirebaseFirestore
+import FirebaseFirestoreSwift
 
-
-struct RecentMessage: Identifiable {
+struct RecentMessage: Codable, Identifiable {
     
-    var id: String { documentId }
-    
-    let documentId: String
+    @DocumentID var id: String?
     let text, fromId, toId: String
     let email, profileImageUrl: String
-    let timestamp: Timestamp
-    
-    init(documentId: String, data: [String: Any]) {
-        self.documentId = documentId
-        self.text = data[FirebaseConstants.text] as? String ?? ""
-        self.email = data[FirebaseConstants.email] as? String ?? ""
-        self.fromId = data[FirebaseConstants.fromId] as? String ?? ""
-        self.toId = data[FirebaseConstants.toId] as? String ?? ""
-        self.profileImageUrl = data[FirebaseConstants.profileImageUrl] as? String ?? ""
-        self.timestamp = data[FirebaseConstants.timestamp] as? Timestamp ?? Timestamp(date: Date())
-    }
+    let timestamp: Date
 }
 
 class MainMessagesViewModel: ObservableObject {
@@ -85,12 +73,17 @@ class MainMessagesViewModel: ObservableObject {
                     let docId = change.document.documentID
                     
                     if let index = self.recentMessages.firstIndex(where: { rm in
-                        return rm.documentId == docId
+                        return rm.id == docId
                     }) {
                         self.recentMessages.remove(at: index)
                     }
                     
-                    self.recentMessages.insert(.init(documentId: docId, data: change.document.data()), at: 0)
+                    do {
+                        let rm = try change.document.data(as: RecentMessage.self)
+                        self.recentMessages.insert(rm, at: 0)
+                    } catch {
+                        print(error)
+                    }
                 })
             }
     }
@@ -136,10 +129,6 @@ struct MainMessagesView: View {
                     .stroke(Color(.label), lineWidth: 1)
                 )
                 .shadow(radius: 5)
-            
-            
-//            Image(systemName: "person.fill")
-//                .font(.system(size: 34, weight: .heavy))
             
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(vm.chatUser?.email ?? "")")
@@ -203,14 +192,15 @@ struct MainMessagesView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(recentMessage.email)
                                     .font(.system(size: 16, weight: .bold))
-                                    .foregroundColor(Color(.label))
+                                    .foregroundColor(Color(.label))                                
+                                    .multilineTextAlignment(.leading)
                                 Text(recentMessage.text)
                                     .font(.system(size: 14))
                                     .foregroundColor(Color(.darkGray))
                                     .multilineTextAlignment(.leading)
                             }
                             Spacer()
-                            Text("22d")
+                            Text(recentMessage.timestamp.description)
                                 .font(.system(size: 14, weight: .semibold))
                         }
                     }
