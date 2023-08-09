@@ -7,13 +7,36 @@
 
 import SwiftUI
 import SDWebImageSwiftUI
+import Firebase
+import FirebaseFirestore
 
+
+struct RecentMessage: Identifiable {
+    
+    var id: String { documentId }
+    
+    let documentId: String
+    let text, fromId, toId: String
+    let email, profileImageUrl: String
+    let timestamp: Timestamp
+    
+    init(documentId: String, data: [String: Any]) {
+        self.documentId = documentId
+        self.text = data[FirebaseConstants.text] as? String ?? ""
+        self.email = data[FirebaseConstants.email] as? String ?? ""
+        self.fromId = data[FirebaseConstants.fromId] as? String ?? ""
+        self.toId = data[FirebaseConstants.toId] as? String ?? ""
+        self.profileImageUrl = data[FirebaseConstants.profileImageUrl] as? String ?? ""
+        self.timestamp = data[FirebaseConstants.timestamp] as? Timestamp ?? Timestamp(date: Date())
+    }
+}
 
 class MainMessagesViewModel: ObservableObject {
     
     @Published var errorMessage = ""
     @Published var chatUser: ChatUser?
     @Published var isUserCurrentlyLogedOut = false
+    @Published var recentMessages = [RecentMessage]()
     
     
     init() {
@@ -21,6 +44,7 @@ class MainMessagesViewModel: ObservableObject {
             self.isUserCurrentlyLogedOut = FirebaseManager.shared.auth.currentUser?.uid == nil
         }
         fetchCurrentUser()
+        fetchRecentMessages()
     }
     
     func fetchCurrentUser() {
@@ -42,6 +66,33 @@ class MainMessagesViewModel: ObservableObject {
     func handleSignOut() {
         isUserCurrentlyLogedOut.toggle()
         try? FirebaseManager.shared.auth.signOut()
+    }
+    
+    private func fetchRecentMessages() {
+        guard let uid = FirebaseManager.shared.auth.currentUser?.uid else { return }
+        
+        FirebaseManager.shared.firestore
+            .collection(FirebaseConstants.recentMessages)
+            .document(uid)
+            .collection("messages")
+            .order(by: FirebaseConstants.timestamp)
+            .addSnapshotListener { querySnapshot, error in
+                if let error = error {
+                    self.errorMessage = "Failed to listen to recent messages: \(error)"
+                    return
+                }
+                querySnapshot?.documentChanges.forEach({ change in
+                    let docId = change.document.documentID
+                    
+                    if let index = self.recentMessages.firstIndex(where: { rm in
+                        return rm.documentId == docId
+                    }) {
+                        self.recentMessages.remove(at: index)
+                    }
+                    
+                    self.recentMessages.insert(.init(documentId: docId, data: change.document.data()), at: 0)
+                })
+            }
     }
     
 }
@@ -75,7 +126,7 @@ struct MainMessagesView: View {
     private var customNavBar: some View {
         HStack(spacing: 16) {
             
-            WebImage(url: URL(string: vm.chatUser?.profileImageUrl ?? ""))
+            WebImage(url: URL(string: vm.chatUser?.profileImageUrl ?? FirebaseConstants.placeholderImage))
                 .resizable()
                 .scaledToFill()
                 .frame(width: 50, height: 50)
@@ -132,25 +183,31 @@ struct MainMessagesView: View {
     
     private var messagesView: some View {
         ScrollView {
-            ForEach(0..<10, id: \.self) { num in
+            ForEach(vm.recentMessages) { recentMessage in
                 VStack {
                     NavigationLink {
                         Text("Destination")
                     } label: {
                         
                         HStack(spacing: 16) {
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 32))
-                                .padding(8)
-                                .overlay(RoundedRectangle(cornerRadius: 44)
+                            WebImage(url: URL(string: recentMessage.profileImageUrl))
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 64, height: 64)
+                                .clipped()
+                                .cornerRadius(64)
+                                .overlay(RoundedRectangle(cornerRadius: 64)
                                     .stroke(Color(.label), lineWidth: 1)
                                 )
-                            VStack(alignment: .leading) {
-                                Text("Username")
+                                .shadow(radius: 5)
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(recentMessage.email)
                                     .font(.system(size: 16, weight: .bold))
-                                Text("Message sent to user")
+                                    .foregroundColor(Color(.label))
+                                Text(recentMessage.text)
                                     .font(.system(size: 14))
-                                    .foregroundColor(Color(.lightGray))
+                                    .foregroundColor(Color(.darkGray))
+                                    .multilineTextAlignment(.leading)
                             }
                             Spacer()
                             Text("22d")

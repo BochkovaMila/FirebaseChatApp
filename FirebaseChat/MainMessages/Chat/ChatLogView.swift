@@ -13,6 +13,11 @@ struct FirebaseConstants {
     static let fromId = "fromId"
     static let toId = "toId"
     static let text = "text"
+    static let timestamp = "timestamp"
+    static let recentMessages = "recent_messages"
+    static let profileImageUrl = "profileImageUrl"
+    static let email = "email"
+    static let placeholderImage = "https://t0.gstatic.com/licensed-image?q=tbn:ANd9GcQkrjYxSfSHeCEA7hkPy8e2JphDsfFHZVKqx-3t37E4XKr-AT7DML8IwtwY0TnZsUcQ"
 }
 
 struct ChatMessage: Identifiable {
@@ -92,7 +97,7 @@ class ChatLogViewModel: ObservableObject {
             .collection(toId)
             .document()
         
-        let messageData = [FirebaseConstants.fromId: fromId, FirebaseConstants.toId: toId, FirebaseConstants.text: self.chatText, "timestamp": Timestamp()] as [String : Any]
+        let messageData = [FirebaseConstants.fromId: fromId, FirebaseConstants.toId: toId, FirebaseConstants.text: self.chatText, FirebaseConstants.timestamp: Timestamp()] as [String : Any]
         
         document.setData(messageData) {error in
             if let error = error {
@@ -101,6 +106,9 @@ class ChatLogViewModel: ObservableObject {
             }
             
             print("Successfully saved current user sending message")
+            
+            self.persistRecentMessage()
+            
             self.chatText = ""
             self.count += 1
         }
@@ -119,6 +127,37 @@ class ChatLogViewModel: ObservableObject {
             }
             
             print("Recipient saved message as well")
+        }
+    }
+    
+    private func persistRecentMessage() {
+        
+        guard let chatUser = chatUser else { return }
+        
+        guard let uid = FirebaseManager.shared.auth.currentUser?.uid else { return }
+        guard let toId = self.chatUser?.uid else { return }
+        
+        let document = FirebaseManager.shared.firestore
+            .collection(FirebaseConstants.recentMessages)
+            .document(uid)
+            .collection("messages")
+            .document(toId)
+        
+        let data = [
+            FirebaseConstants.timestamp: Timestamp(),
+            FirebaseConstants.text: self.chatText,
+            FirebaseConstants.fromId: uid,
+            FirebaseConstants.toId: toId,
+            FirebaseConstants.profileImageUrl: chatUser.profileImageUrl,
+            FirebaseConstants.email: chatUser.email
+        ] as [String : Any]
+        
+        document.setData(data) { error in
+            if let error = error {
+                self.errorMessage = "Failed to save recent message: \(error)"
+                print("Failed to save recent message: \(error)")
+                return
+            }
         }
     }
 }
@@ -141,11 +180,6 @@ struct ChatLogView: View {
         }
         .navigationTitle(chatUser?.email ?? "")
         .navigationBarTitleDisplayMode(.inline)
-//        .navigationBarItems(trailing: Button(action: {
-//            vm.count += 1
-//        }, label: {
-//            Text("Count: \(vm.count)")
-//        }))
     }
     
     private var chatBottomBar: some View {
