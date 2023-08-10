@@ -20,6 +20,7 @@ struct LoginView: View {
     @State private var password = ""
     @State private var shouldShowImagePicker = false
     @State var image: UIImage?
+    @State var loginStatusMessage = ""
     
     var body: some View {
         NavigationView {
@@ -100,8 +101,6 @@ struct LoginView: View {
             createNewAccount()
         }
     }
-    
-    @State var loginStatusMessage = ""
     
     private func createNewAccount() {
         

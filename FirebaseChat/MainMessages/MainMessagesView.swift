@@ -11,14 +11,6 @@ import Firebase
 import FirebaseFirestore
 import FirebaseFirestoreSwift
 
-struct RecentMessage: Codable, Identifiable {
-    
-    @DocumentID var id: String?
-    let text, fromId, toId: String
-    let email, profileImageUrl: String
-    let timestamp: Date
-}
-
 class MainMessagesViewModel: ObservableObject {
     
     @Published var errorMessage = ""
